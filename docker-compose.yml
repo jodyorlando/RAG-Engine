@@ -1,0 +1,45 @@
+version: '3.8'
+
+services:
+  rag_app:
+    build: .
+    container_name: rag_app
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://postgres:postgres@rag_postgres_db:5432/rag_db
+      - REDIS_URL=redis://rag_redis:6379/0
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+    volumes:
+      - ./app:/app/app
+    depends_on:
+      rag_postgres_db:
+        condition: service_healthy
+      rag_redis:
+        condition: service_started
+
+  rag_postgres_db:
+    image: pgvector/pgvector:pg16
+    container_name: rag_postgres_db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: rag_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - rag_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d rag_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  rag_redis:
+    image: redis:7-alpine
+    container_name: rag_redis
+    ports:
+      - "6379:6379"
+
+volumes:
+  rag_postgres_data:
